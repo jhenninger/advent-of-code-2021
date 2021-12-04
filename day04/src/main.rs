@@ -32,15 +32,14 @@ impl FromStr for Board {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let board = s
-            .lines()
+        s.lines()
             .map(|l| {
                 l.split_ascii_whitespace()
                     .map(|n| Ok((n.parse()?, false)))
                     .collect()
             })
-            .collect::<Result<_, _>>()?;
-        Ok(Board { board })
+            .collect::<Result<_, _>>()
+            .map(|board| Board { board })
     }
 }
 
