@@ -1,6 +1,6 @@
 fn main() {
     let input = include_str!("../input").trim();
-    let mut timers = vec![0usize; 9];
+    let mut timers = [0usize; 9];
 
     for fish in input.split(',') {
         let timer: usize = fish.parse().unwrap();
