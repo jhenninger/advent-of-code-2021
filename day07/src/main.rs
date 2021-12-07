@@ -7,10 +7,10 @@ fn main() {
     positions.sort_unstable();
 
     let median = positions[positions.len() / 2];
-
     let part_1: i32 = positions.iter().map(|p| (median - p).abs()).sum();
 
-    let part_2: i32 = (positions[0]..=positions[positions.len() - 1])
+    let mean = positions.iter().sum::<i32>() / positions.len() as i32;
+    let part_2: i32 = (mean..=mean + 1)
         .map(|target| {
             positions
                 .iter()
