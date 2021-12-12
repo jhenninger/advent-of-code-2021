@@ -15,31 +15,12 @@ fn main() {
 
     println!(
         "Part 1: {}\nPart 2: {}",
-        part_1(&connections, HashSet::new(), "start"),
-        part_2(&connections, HashSet::new(), "start", true)
+        count_paths(&connections, HashSet::new(), "start", false),
+        count_paths(&connections, HashSet::new(), "start", true)
     );
 }
 
-fn part_1<'a>(
-    connections: &'a Connections,
-    mut visited: HashSet<&'a str>,
-    current: &'a str,
-) -> usize {
-    if current == "end" {
-        return 1;
-    }
-
-    if is_small(current) && !visited.insert(current) {
-        return 0;
-    }
-
-    connections[current]
-        .iter()
-        .map(|&next| part_1(connections, visited.clone(), next))
-        .sum()
-}
-
-fn part_2<'a>(
+fn count_paths<'a>(
     connections: &'a Connections,
     mut visited: HashSet<&'a str>,
     current: &'a str,
@@ -50,7 +31,6 @@ fn part_2<'a>(
     }
 
     let duplicate_required = is_small(current) && !visited.insert(current);
-
     if duplicate_required && !duplicate_allowed {
         return 0;
     }
@@ -59,7 +39,7 @@ fn part_2<'a>(
         .iter()
         .filter(|&&next| next != "start")
         .map(|&next| {
-            part_2(
+            count_paths(
                 connections,
                 visited.clone(),
                 next,
