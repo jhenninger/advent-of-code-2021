@@ -47,8 +47,5 @@ fn solve(polymer: &[u8], rules: &HashMap<(u8, u8), u8>, iterations: usize) -> us
         mem::swap(&mut next, &mut pairs);
     }
 
-    let min = counts.iter().min_by_key(|p| p.1).unwrap();
-    let max = counts.iter().max_by_key(|p| p.1).unwrap();
-
-    max.1 - min.1
+    counts.values().max().unwrap() - counts.values().min().unwrap()
 }
