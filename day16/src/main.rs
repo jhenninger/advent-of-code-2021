@@ -4,40 +4,10 @@ struct Packet {
     packet_type: PacketType,
 }
 
-impl Packet {
-    fn version_sum(&self) -> u64 {
-        match &self.packet_type {
-            PacketType::Literal(_) => self.version,
-            PacketType::Operator { op: _, subpackets } => {
-                self.version + subpackets.iter().map(|p| p.version_sum()).sum::<u64>()
-            }
-        }
-    }
-
-    fn evaluate(&self) -> u64 {
-        match &self.packet_type {
-            PacketType::Literal(value) => *value,
-            PacketType::Operator { op, subpackets } => {
-                let mut subvalues = subpackets.iter().map(|p| p.evaluate());
-
-                match op {
-                    Op::Sum => subvalues.sum(),
-                    Op::Prod => subvalues.product(),
-                    Op::Min => subvalues.min().unwrap(),
-                    Op::Max => subvalues.max().unwrap(),
-                    Op::GT => (subvalues.next().unwrap() > subvalues.next().unwrap()) as u64,
-                    Op::LT => (subvalues.next().unwrap() < subvalues.next().unwrap()) as u64,
-                    Op::EQ => (subvalues.next().unwrap() == subvalues.next().unwrap()) as u64,
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 enum PacketType {
     Literal(u64),
-    Operator { op: Op, subpackets: Vec<Packet> },
+    Operator { op: Op, packets: Vec<Packet> },
 }
 
 #[derive(Debug)]
@@ -49,6 +19,36 @@ enum Op {
     GT,
     LT,
     EQ,
+}
+
+impl Packet {
+    fn version_sum(&self) -> u64 {
+        match &self.packet_type {
+            PacketType::Literal(_) => self.version,
+            PacketType::Operator { op: _, packets } => {
+                self.version + packets.iter().map(|p| p.version_sum()).sum::<u64>()
+            }
+        }
+    }
+
+    fn evaluate(&self) -> u64 {
+        match &self.packet_type {
+            PacketType::Literal(value) => *value,
+            PacketType::Operator { op, packets } => {
+                let mut values = packets.iter().map(|p| p.evaluate());
+
+                match op {
+                    Op::Sum => values.sum(),
+                    Op::Prod => values.product(),
+                    Op::Min => values.min().unwrap(),
+                    Op::Max => values.max().unwrap(),
+                    Op::GT => (values.next().unwrap() > values.next().unwrap()) as u64,
+                    Op::LT => (values.next().unwrap() < values.next().unwrap()) as u64,
+                    Op::EQ => (values.next().unwrap() == values.next().unwrap()) as u64,
+                }
+            }
+        }
+    }
 }
 
 fn main() {
@@ -90,59 +90,60 @@ fn parse(input: &mut &str) -> Packet {
     let version = consume(input, 3);
     let type_id = consume(input, 3);
 
-    if type_id == 4 {
+    let packet_type = if type_id == 4 {
         let mut value = 0;
         loop {
             value <<= 4;
             let group = consume(input, 5);
             value += group & 0xF;
             if group & 0x10 == 0 {
-                break;
+                break PacketType::Literal(value);
             }
         }
-        return Packet {
-            version,
-            packet_type: PacketType::Literal(value),
+    } else {
+        let length_type_id = consume(input, 1);
+
+        let mut packets = Vec::new();
+
+        match length_type_id {
+            0 => {
+                let length = consume(input, 15);
+                let (mut left, right) = input.split_at(length as usize);
+                *input = right;
+
+                while !left.is_empty() {
+                    packets.push(parse(&mut left));
+                }
+            }
+            1 => {
+                let count = consume(input, 11);
+                for _ in 0..count {
+                    packets.push(parse(input))
+                }
+            }
+            _ => panic!("Unknown length type id: {}", length_type_id),
         };
-    }
 
-    let length_type_id = consume(input, 1);
+        let op = match type_id {
+            0 => Op::Sum,
+            1 => Op::Prod,
+            2 => Op::Min,
+            3 => Op::Max,
+            5 => Op::GT,
+            6 => Op::LT,
+            7 => Op::EQ,
+            _ => panic!("Unknown type_id: {}", length_type_id),
+        };
 
-    let mut subpackets = Vec::new();
-
-    match length_type_id {
-        0 => {
-            let length = consume(input, 15);
-            let (mut left, right) = input.split_at(length as usize);
-            *input = right;
-
-            while !left.is_empty() {
-                subpackets.push(parse(&mut left));
-            }
+        PacketType::Operator {
+            op,
+            packets,
         }
-        1 => {
-            let count = consume(input, 11);
-            for _ in 0..count {
-                subpackets.push(parse(input))
-            }
-        }
-        _ => panic!(),
-    };
-
-    let op = match type_id {
-        0 => Op::Sum,
-        1 => Op::Prod,
-        2 => Op::Min,
-        3 => Op::Max,
-        5 => Op::GT,
-        6 => Op::LT,
-        7 => Op::EQ,
-        _ => panic!(),
     };
 
     Packet {
         version,
-        packet_type: PacketType::Operator { op, subpackets },
+        packet_type,
     }
 }
 
