@@ -88,56 +88,52 @@ fn main() {
 
 fn parse(input: &mut &str) -> Packet {
     let version = consume(input, 3);
-    let type_id = consume(input, 3);
 
-    let packet_type = if type_id == 4 {
-        let mut value = 0;
-        loop {
-            value <<= 4;
-            let group = consume(input, 5);
-            value += group & 0xF;
-            if group & 0x10 == 0 {
-                break PacketType::Literal(value);
+    let packet_type = match consume(input, 3) {
+        4 => {
+            let mut value = 0;
+            loop {
+                let group = consume(input, 5);
+                value = (value << 4) + (group & 0b1111);
+                if group >> 4 == 0 {
+                    break PacketType::Literal(value);
+                }
             }
         }
-    } else {
-        let length_type_id = consume(input, 1);
+        type_id => {
+            let mut packets = Vec::new();
 
-        let mut packets = Vec::new();
+            match consume(input, 1) {
+                0 => {
+                    let length = consume(input, 15);
+                    let (mut left, right) = input.split_at(length as usize);
+                    *input = right;
 
-        match length_type_id {
-            0 => {
-                let length = consume(input, 15);
-                let (mut left, right) = input.split_at(length as usize);
-                *input = right;
-
-                while !left.is_empty() {
-                    packets.push(parse(&mut left));
+                    while !left.is_empty() {
+                        packets.push(parse(&mut left));
+                    }
                 }
-            }
-            1 => {
-                let count = consume(input, 11);
-                for _ in 0..count {
-                    packets.push(parse(input))
+                1 => {
+                    let count = consume(input, 11);
+                    for _ in 0..count {
+                        packets.push(parse(input))
+                    }
                 }
-            }
-            _ => panic!("Unknown length type id: {}", length_type_id),
-        };
+                invalid => panic!("Invalid length type ID: {}", invalid),
+            };
 
-        let op = match type_id {
-            0 => Op::Sum,
-            1 => Op::Prod,
-            2 => Op::Min,
-            3 => Op::Max,
-            5 => Op::GT,
-            6 => Op::LT,
-            7 => Op::EQ,
-            _ => panic!("Unknown type_id: {}", length_type_id),
-        };
+            let op = match type_id {
+                0 => Op::Sum,
+                1 => Op::Prod,
+                2 => Op::Min,
+                3 => Op::Max,
+                5 => Op::GT,
+                6 => Op::LT,
+                7 => Op::EQ,
+                invalid => panic!("Invalid type ID: {}", invalid),
+            };
 
-        PacketType::Operator {
-            op,
-            packets,
+            PacketType::Operator { op, packets }
         }
     };
 
