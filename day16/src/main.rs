@@ -77,7 +77,7 @@ fn main() {
         })
         .collect();
 
-    let (packet, _) = parse(&input);
+    let packet = parse(&mut input.as_str());
 
     println!(
         "Part 1: {}\nPart 2: {}",
@@ -86,60 +86,45 @@ fn main() {
     );
 }
 
-fn parse(pkg: &str) -> (Packet, &str) {
-    let (version, rest) = pkg.split_at(3);
-    let (type_id, mut rest) = rest.split_at(3);
-
-    let version = u64::from_str_radix(version, 2).unwrap();
-    let type_id = u64::from_str_radix(type_id, 2).unwrap();
+fn parse(input: &mut &str) -> Packet {
+    let version = consume(input, 3);
+    let type_id = consume(input, 3);
 
     if type_id == 4 {
-        let mut literal = 0;
+        let mut value = 0;
         loop {
-            literal = literal << 4;
-            literal += u64::from_str_radix(&rest[1..5], 2).unwrap();
-            let is_last = rest.starts_with('0');
-            rest = &rest[5..];
-            if is_last {
+            value <<= 4;
+            let group = consume(input, 5);
+            value += group & 0xF;
+            if group & 0x10 == 0 {
                 break;
             }
         }
-        return (
-            Packet {
-                version,
-                packet_type: PacketType::Literal(literal),
-            },
-            rest,
-        );
+        return Packet {
+            version,
+            packet_type: PacketType::Literal(value),
+        };
     }
 
-    let (length_type_id, mut rest) = rest.split_at(1);
+    let length_type_id = consume(input, 1);
 
     let mut subpackets = Vec::new();
 
-    rest = match length_type_id {
-        "0" => {
-            let (length, rest) = rest.split_at(15);
-            let length = usize::from_str_radix(length, 2).unwrap();
-            let (mut rest, ret) = rest.split_at(length);
+    match length_type_id {
+        0 => {
+            let length = consume(input, 15);
+            let (mut left, right) = input.split_at(length as usize);
+            *input = right;
 
-            while !rest.is_empty() {
-                let (subpacket, subrest) = parse(rest);
-                subpackets.push(subpacket);
-                rest = subrest;
+            while !left.is_empty() {
+                subpackets.push(parse(&mut left));
             }
-            ret
         }
-        "1" => {
-            let (count, mut rest) = rest.split_at(11);
-            let count = usize::from_str_radix(count, 2).unwrap();
-
+        1 => {
+            let count = consume(input, 11);
             for _ in 0..count {
-                let (subpacket, subrest) = parse(rest);
-                rest = subrest;
-                subpackets.push(subpacket);
+                subpackets.push(parse(input))
             }
-            rest
         }
         _ => panic!(),
     };
@@ -155,11 +140,14 @@ fn parse(pkg: &str) -> (Packet, &str) {
         _ => panic!(),
     };
 
-    (
-        Packet {
-            version,
-            packet_type: PacketType::Operator { op, subpackets },
-        },
-        rest,
-    )
+    Packet {
+        version,
+        packet_type: PacketType::Operator { op, subpackets },
+    }
+}
+
+fn consume(input: &mut &str, bits: usize) -> u64 {
+    let (left, right) = input.split_at(bits);
+    *input = right;
+    u64::from_str_radix(left, 2).unwrap()
 }
