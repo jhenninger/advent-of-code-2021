@@ -6,6 +6,8 @@ fn main() {
 
     let enhancement: Vec<bool> = enhancement.chars().map(|c| c == '#').collect();
 
+    assert!(!enhancement[0] || !enhancement[enhancement.len() - 1], "∞");
+
     let mut image: HashSet<(i32, i32)> = image
         .lines()
         .enumerate()
@@ -36,8 +38,9 @@ fn main() {
                 let mut idx = 0;
                 for ny in y - 1..=y + 1 {
                     for nx in x - 1..=x + 1 {
-                        let outside_and_active =
-                            i % 2 == 1 && (nx < min_x || nx > max_x || ny < min_y || ny > max_y);
+                        let outside_and_active = enhancement[0]
+                            && i % 2 == 1
+                            && (nx < min_x || nx > max_x || ny < min_y || ny > max_y);
                         idx = idx << 1 | (outside_and_active || image.contains(&(nx, ny))) as usize;
                     }
                 }
